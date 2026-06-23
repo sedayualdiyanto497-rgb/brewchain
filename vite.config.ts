@@ -5,14 +5,12 @@
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 
-const require = createRequire(import.meta.url);
-const rpcWsPkg = require.resolve("rpc-websockets/package.json");
-const rpcWsDir = dirname(rpcWsPkg);
-const rpcWsBrowser = join(rpcWsDir, "dist/index.browser.mjs");
-const rpcWsNode = join(rpcWsDir, "dist/index.mjs");
+const rootDir = dirname(fileURLToPath(import.meta.url));
+const rpcWsBrowser = resolve(rootDir, "node_modules/rpc-websockets/dist/index.browser.mjs");
+const rpcWsNode = resolve(rootDir, "node_modules/rpc-websockets/dist/index.mjs");
 
 export default defineConfig({
   tanstackStart: {
@@ -21,8 +19,6 @@ export default defineConfig({
   vite: {
     resolve: {
       alias: [
-        // rpc-websockets exports map only declares "browser" and "node" — workerd
-        // and the client build both fail to resolve "." cleanly. Alias to the actual files.
         {
           find: /^rpc-websockets$/,
           replacement: typeof globalThis.window === "undefined" ? rpcWsNode : rpcWsBrowser,
