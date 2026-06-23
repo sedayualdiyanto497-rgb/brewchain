@@ -89,9 +89,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "Kedai kopi premium dengan pembayaran on-chain di Solana Devnet — terhubung lewat Phantom, Solflare, dan Backpack." },
       { name: "author", content: "BrewChain" },
       { property: "og:title", content: "BrewChain — Premium Coffee on Solana" },
-      { property: "og:description", content: "Pesan kopi, bayar dengan SOL, dan tracking transaksi langsung di Solana Explorer." },
+      { property: "og:description", content: "Kedai kopi premium dengan pembayaran on-chain di Solana Devnet — terhubung lewat Phantom, Solflare, dan Backpack." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "BrewChain — Premium Coffee on Solana" },
+      { name: "twitter:description", content: "Kedai kopi premium dengan pembayaran on-chain di Solana Devnet — terhubung lewat Phantom, Solflare, dan Backpack." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/f199186d-1074-4383-9b79-5aa6c8abd85c/id-preview-3118bec1--4718f54d-a7f3-4eec-bb51-b763cceed42a.lovable.app-1782237714145.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/f199186d-1074-4383-9b79-5aa6c8abd85c/id-preview-3118bec1--4718f54d-a7f3-4eec-bb51-b763cceed42a.lovable.app-1782237714145.png" },
     ],
     links: [
       {
