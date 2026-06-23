@@ -7,10 +7,18 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, type ReactNode } from "react";
+import { Toaster } from "@/components/ui/sonner";
+import { ClientOnly } from "@/components/brewchain/ClientOnly";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+
+// Solana wallet adapters reference browser globals (window, Buffer, indexedDB).
+// Lazy + ClientOnly keeps them out of the SSR module graph.
+const SolanaProviders = lazy(() =>
+  import("@/components/brewchain/SolanaProviders").then((m) => ({ default: m.SolanaProviders })),
+);
 
 function NotFoundComponent() {
   return (
@@ -77,14 +85,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "BrewChain — Premium Coffee on Solana" },
+      { name: "description", content: "Kedai kopi premium dengan pembayaran on-chain di Solana Devnet — terhubung lewat Phantom, Solflare, dan Backpack." },
+      { name: "author", content: "BrewChain" },
+      { property: "og:title", content: "BrewChain — Premium Coffee on Solana" },
+      { property: "og:description", content: "Pesan kopi, bayar dengan SOL, dan tracking transaksi langsung di Solana Explorer." },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
       {
@@ -101,7 +108,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="id">
       <head>
         <HeadContent />
       </head>
@@ -118,8 +125,14 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <ClientOnly fallback={<Outlet />}>
+        <Suspense fallback={<Outlet />}>
+          <SolanaProviders>
+            <Outlet />
+          </SolanaProviders>
+        </Suspense>
+      </ClientOnly>
+      <Toaster position="top-right" richColors />
     </QueryClientProvider>
   );
 }

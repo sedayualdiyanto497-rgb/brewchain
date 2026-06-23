@@ -9,38 +9,227 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SuccessRouteImport } from './routes/success'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as MenuRouteImport } from './routes/menu'
+import { Route as HistoryRouteImport } from './routes/history'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as CartRouteImport } from './routes/cart'
+import { Route as BlockchainRouteImport } from './routes/blockchain'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TrackingOrderIdRouteImport } from './routes/tracking.$orderId'
+import { Route as MenuSlugRouteImport } from './routes/menu.$slug'
 
+const SuccessRoute = SuccessRouteImport.update({
+  id: '/success',
+  path: '/success',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MenuRoute = MenuRouteImport.update({
+  id: '/menu',
+  path: '/menu',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutRoute = CheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CartRoute = CartRouteImport.update({
+  id: '/cart',
+  path: '/cart',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BlockchainRoute = BlockchainRouteImport.update({
+  id: '/blockchain',
+  path: '/blockchain',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TrackingOrderIdRoute = TrackingOrderIdRouteImport.update({
+  id: '/tracking/$orderId',
+  path: '/tracking/$orderId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MenuSlugRoute = MenuSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => MenuRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/blockchain': typeof BlockchainRoute
+  '/cart': typeof CartRoute
+  '/checkout': typeof CheckoutRoute
+  '/dashboard': typeof DashboardRoute
+  '/history': typeof HistoryRoute
+  '/menu': typeof MenuRouteWithChildren
+  '/profile': typeof ProfileRoute
+  '/success': typeof SuccessRoute
+  '/menu/$slug': typeof MenuSlugRoute
+  '/tracking/$orderId': typeof TrackingOrderIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/blockchain': typeof BlockchainRoute
+  '/cart': typeof CartRoute
+  '/checkout': typeof CheckoutRoute
+  '/dashboard': typeof DashboardRoute
+  '/history': typeof HistoryRoute
+  '/menu': typeof MenuRouteWithChildren
+  '/profile': typeof ProfileRoute
+  '/success': typeof SuccessRoute
+  '/menu/$slug': typeof MenuSlugRoute
+  '/tracking/$orderId': typeof TrackingOrderIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/blockchain': typeof BlockchainRoute
+  '/cart': typeof CartRoute
+  '/checkout': typeof CheckoutRoute
+  '/dashboard': typeof DashboardRoute
+  '/history': typeof HistoryRoute
+  '/menu': typeof MenuRouteWithChildren
+  '/profile': typeof ProfileRoute
+  '/success': typeof SuccessRoute
+  '/menu/$slug': typeof MenuSlugRoute
+  '/tracking/$orderId': typeof TrackingOrderIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/blockchain'
+    | '/cart'
+    | '/checkout'
+    | '/dashboard'
+    | '/history'
+    | '/menu'
+    | '/profile'
+    | '/success'
+    | '/menu/$slug'
+    | '/tracking/$orderId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/blockchain'
+    | '/cart'
+    | '/checkout'
+    | '/dashboard'
+    | '/history'
+    | '/menu'
+    | '/profile'
+    | '/success'
+    | '/menu/$slug'
+    | '/tracking/$orderId'
+  id:
+    | '__root__'
+    | '/'
+    | '/blockchain'
+    | '/cart'
+    | '/checkout'
+    | '/dashboard'
+    | '/history'
+    | '/menu'
+    | '/profile'
+    | '/success'
+    | '/menu/$slug'
+    | '/tracking/$orderId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BlockchainRoute: typeof BlockchainRoute
+  CartRoute: typeof CartRoute
+  CheckoutRoute: typeof CheckoutRoute
+  DashboardRoute: typeof DashboardRoute
+  HistoryRoute: typeof HistoryRoute
+  MenuRoute: typeof MenuRouteWithChildren
+  ProfileRoute: typeof ProfileRoute
+  SuccessRoute: typeof SuccessRoute
+  TrackingOrderIdRoute: typeof TrackingOrderIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/success': {
+      id: '/success'
+      path: '/success'
+      fullPath: '/success'
+      preLoaderRoute: typeof SuccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/menu': {
+      id: '/menu'
+      path: '/menu'
+      fullPath: '/menu'
+      preLoaderRoute: typeof MenuRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout': {
+      id: '/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cart': {
+      id: '/cart'
+      path: '/cart'
+      fullPath: '/cart'
+      preLoaderRoute: typeof CartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/blockchain': {
+      id: '/blockchain'
+      path: '/blockchain'
+      fullPath: '/blockchain'
+      preLoaderRoute: typeof BlockchainRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +237,45 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tracking/$orderId': {
+      id: '/tracking/$orderId'
+      path: '/tracking/$orderId'
+      fullPath: '/tracking/$orderId'
+      preLoaderRoute: typeof TrackingOrderIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/menu/$slug': {
+      id: '/menu/$slug'
+      path: '/$slug'
+      fullPath: '/menu/$slug'
+      preLoaderRoute: typeof MenuSlugRouteImport
+      parentRoute: typeof MenuRoute
+    }
   }
 }
 
+interface MenuRouteChildren {
+  MenuSlugRoute: typeof MenuSlugRoute
+}
+
+const MenuRouteChildren: MenuRouteChildren = {
+  MenuSlugRoute: MenuSlugRoute,
+}
+
+const MenuRouteWithChildren = MenuRoute._addFileChildren(MenuRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BlockchainRoute: BlockchainRoute,
+  CartRoute: CartRoute,
+  CheckoutRoute: CheckoutRoute,
+  DashboardRoute: DashboardRoute,
+  HistoryRoute: HistoryRoute,
+  MenuRoute: MenuRouteWithChildren,
+  ProfileRoute: ProfileRoute,
+  SuccessRoute: SuccessRoute,
+  TrackingOrderIdRoute: TrackingOrderIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
