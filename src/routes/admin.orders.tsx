@@ -116,7 +116,7 @@ function AdminOrders() {
                         {tx ? (
                           <a href={tx.explorer_url ?? "#"} target="_blank" rel="noreferrer"
                             className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline">
-                            {tx.tx_signature.slice(0, 10)}… <ExternalLink className="size-3" />
+                            {(tx.tx_signature ?? "").slice(0, 10)}… <ExternalLink className="size-3" />
                           </a>
                         ) : <span className="text-xs text-muted-foreground">—</span>}
                         {tx && <div className="text-[10px] uppercase text-muted-foreground">{tx.network}</div>}
