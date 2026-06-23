@@ -1,9 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { LAMPORTS_PER_SOL, SystemProgram, Transaction, PublicKey } from "@solana/web3.js";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Wallet, QrCode, Building2, ShieldCheck, CheckCircle2, Circle, ExternalLink } from "lucide-react";
+import { Loader2, Wallet, Sparkles, ShieldCheck, CheckCircle2, Circle, ExternalLink } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +10,7 @@ import { useCart, cart } from "@/lib/brewchain/cart-store";
 import { useWalletAuth } from "@/contexts/WalletAuthProvider";
 import { formatIDR, formatSOL, shortAddr } from "@/lib/brewchain/format";
 import { MERCHANT_WALLET } from "@/lib/solana/config";
-import { createOrder, recordBlockchainTransaction } from "@/lib/brewchain/orders.functions";
+import { createOrder, payOrderDemo } from "@/lib/brewchain/orders.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/checkout")({
@@ -21,26 +19,21 @@ export const Route = createFileRoute("/checkout")({
   component: () => <AppShell><ClientOnly><CheckoutPage /></ClientOnly></AppShell>,
 });
 
-type Method = "solana" | "qris" | "bank_transfer";
-
 type PayStage = "creating" | "signing" | "broadcasting" | "confirming" | "recording" | "done" | "error";
 
 const STAGES: Array<{ key: PayStage; label: string; desc: string }> = [
-  { key: "creating",     label: "Membuat pesanan",        desc: "Mengunci harga & stok di server" },
-  { key: "signing",      label: "Tanda tangan wallet",    desc: "Setujui transaksi di wallet kamu" },
-  { key: "broadcasting", label: "Mengirim ke Devnet",     desc: "Broadcast transaksi ke validator Solana" },
-  { key: "confirming",   label: "Menunggu konfirmasi",    desc: "Menunggu finalisasi on-chain" },
-  { key: "recording",    label: "Mencatat ke database",   desc: "Menyimpan signature & memperbarui pesanan" },
+  { key: "creating",     label: "Membuat pesanan",         desc: "Mengunci harga & stok di server" },
+  { key: "signing",      label: "Tanda tangan demo wallet",desc: "Simulasi persetujuan transaksi" },
+  { key: "broadcasting", label: "Mengirim ke Devnet",      desc: "Broadcast transaksi simulasi" },
+  { key: "confirming",   label: "Menunggu konfirmasi",     desc: "Menunggu finalisasi on-chain" },
+  { key: "recording",    label: "Mencatat ke database",    desc: "Menyimpan signature & memperbarui pesanan" },
 ];
 
 function CheckoutPage() {
   const items = useCart();
   const { voucher } = Route.useSearch();
   const { session, isAuthenticated } = useWalletAuth();
-  const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
   const navigate = useNavigate();
-  const [method, setMethod] = useState<Method>("solana");
   const [paying, setPaying] = useState(false);
   const [stage, setStage] = useState<PayStage | null>(null);
   const [stageError, setStageError] = useState<string | null>(null);
@@ -64,63 +57,31 @@ function CheckoutPage() {
     setLiveSig(null);
     try {
       setStage("creating");
-      // 1) create order on server (computes prices server-side, locks voucher)
       const order = await createOrder({
         data: {
           walletAddress: session.walletAddress,
           items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
           voucherCode: voucher ?? null,
-          paymentMethod: method,
+          paymentMethod: "solana",
         },
       });
 
-      // 2) For solana method, send on-chain transaction
-      if (method === "solana") {
-        if (!publicKey || !sendTransaction) throw new Error("Wallet tidak siap");
-        const lamports = Math.round(Number(order.total_sol) * LAMPORTS_PER_SOL);
-        const tx = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: publicKey,
-            toPubkey: new PublicKey(merchantAddr),
-            lamports,
-          }),
-        );
-        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-        tx.recentBlockhash = blockhash;
-        tx.feePayer = publicKey;
-
-        setStage("signing");
-        const signature = await sendTransaction(tx, connection);
-        setLiveSig(signature);
-        setStage("broadcasting");
-        // small UX beat so user sees the broadcast stage
-        await new Promise((r) => setTimeout(r, 300));
-        setStage("confirming");
-        await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
-
-        setStage("recording");
-        await recordBlockchainTransaction({
-          data: {
-            orderId: order.id,
-            walletAddress: session.walletAddress,
-            recipientAddress: merchantAddr,
-            txSignature: signature,
-            totalSol: Number(order.total_sol),
-            blockTime: Math.floor(Date.now() / 1000),
-          },
-        });
-
-        setStage("done");
-        cart.clear();
-        await new Promise((r) => setTimeout(r, 600));
-        navigate({ to: "/success", search: { orderId: order.id, sig: signature } as never });
-        return;
-      }
-
-      // QRIS / bank — verifikasi manual oleh kasir
+      // Demo wallet flow — fully simulated (no real SOL needed)
+      setStage("signing");
+      await new Promise((r) => setTimeout(r, 700));
+      setStage("broadcasting");
+      await new Promise((r) => setTimeout(r, 500));
+      setStage("confirming");
+      const res = await payOrderDemo({
+        data: { orderId: order.id, walletAddress: session.walletAddress },
+      });
+      setLiveSig(res.signature);
+      setStage("recording");
+      await new Promise((r) => setTimeout(r, 400));
       setStage("done");
       cart.clear();
-      navigate({ to: "/tracking/$orderId", params: { orderId: order.id } });
+      await new Promise((r) => setTimeout(r, 600));
+      navigate({ to: "/success", search: { orderId: order.id, sig: res.signature } as never });
     } catch (e) {
       console.error(e);
       setStage("error");
@@ -145,28 +106,24 @@ function CheckoutPage() {
           <CardContent className="p-6">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Wallet Tujuan (Merchant)</div>
             <div className="mt-1 font-mono text-sm">{merchantAddr}</div>
-            <div className="mt-1 text-xs text-muted-foreground">Solana · Devnet</div>
+            <div className="mt-1 text-xs text-muted-foreground">Solana · Devnet (Demo Mode)</div>
           </CardContent>
         </Card>
 
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Metode Pembayaran</h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            {([
-              { id: "solana" as Method, icon: Wallet, label: "Solana", desc: "Bayar SOL on-chain" },
-              { id: "qris" as Method, icon: QrCode, label: "QRIS", desc: "Verifikasi kasir" },
-              { id: "bank_transfer" as Method, icon: Building2, label: "Bank Transfer", desc: "Verifikasi kasir" },
-            ]).map((m) => (
-              <motion.button
-                key={m.id} type="button" whileHover={{ y: -2 }}
-                onClick={() => setMethod(m.id)}
-                className={`rounded-2xl border p-4 text-left transition ${method === m.id ? "border-primary bg-primary/5 shadow-soft" : "border-border bg-card"}`}
-              >
-                <m.icon className="size-5" />
-                <div className="mt-2 font-semibold">{m.label}</div>
-                <div className="text-xs text-muted-foreground">{m.desc}</div>
-              </motion.button>
-            ))}
+          <div className="mt-3 rounded-2xl border border-primary bg-primary/5 p-4 shadow-soft">
+            <div className="flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-xl gradient-solana text-white shadow-glow-sol">
+                <Sparkles className="size-5" />
+              </div>
+              <div>
+                <div className="font-semibold">Demo Wallet Solana</div>
+                <div className="text-xs text-muted-foreground">
+                  Simulasi pembayaran Devnet — tidak memerlukan SOL asli. Cocok untuk pengujian & demo skripsi.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -210,7 +167,7 @@ function CheckoutPage() {
           </div>
 
           <Button className="mt-6 w-full rounded-full gradient-solana text-white shadow-glow-sol" size="lg" disabled={paying || !isAuthenticated} onClick={handlePay}>
-            {paying ? <><Loader2 className="size-4 animate-spin" /> Memproses…</> : `Bayar ${method === "solana" ? formatSOL(totalSol) : formatIDR(total)}`}
+            {paying ? <><Loader2 className="size-4 animate-spin" /> Memproses…</> : <><Wallet className="size-4" /> Bayar {formatSOL(totalSol)} (Demo)</>}
           </Button>
         </CardContent>
       </Card>

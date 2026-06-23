@@ -217,6 +217,134 @@ export const recordBlockchainTransaction = createServerFn({ method: "POST" })
     return { explorerUrl };
   });
 
+// ---------- Demo Wallet Payment ----------
+// Simulates a Solana Devnet payment without requiring real SOL / wallet signature.
+// Generates a plausible-looking signature, records a transaction row with network="devnet-demo",
+// updates order status, and awards loyalty points (same as real flow).
+function fakeSignature() {
+  const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  let s = "";
+  for (let i = 0; i < 88; i++) s += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return s;
+}
+
+const DemoPaySchema = z.object({
+  orderId: z.string().uuid(),
+  walletAddress: z.string(),
+});
+
+export const payOrderDemo = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => DemoPaySchema.parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: order } = await supabaseAdmin
+      .from("orders")
+      .select("*")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (!order) throw new Error("Order tidak ditemukan");
+    if (order.status !== "pending") throw new Error("Order sudah diproses");
+
+    const signature = `demo_${fakeSignature()}`;
+    const explorerUrl = `https://explorer.solana.com/?cluster=devnet`;
+
+    const { error: txErr } = await supabaseAdmin.from("transactions").insert({
+      order_id: data.orderId,
+      wallet_address: data.walletAddress,
+      recipient_address: "DEMO_MERCHANT_WALLET_SIMULATED",
+      tx_signature: signature,
+      block_time: Math.floor(Date.now() / 1000),
+      total_sol: Number(order.total_sol),
+      status: "confirmed",
+      explorer_url: explorerUrl,
+      network: "devnet-demo",
+    });
+    if (txErr) throw new Error(txErr.message);
+
+    await supabaseAdmin.from("orders").update({ status: "paid" }).eq("id", data.orderId);
+
+    const points = Math.floor(order.total_idr / 10000);
+    await supabaseAdmin.from("loyalty_ledger").insert({
+      wallet_address: order.wallet_address,
+      order_id: data.orderId,
+      points,
+      reason: "Pembayaran demo wallet",
+    });
+    const { data: prof } = await supabaseAdmin
+      .from("profiles")
+      .select("total_points, total_orders, total_spent_idr")
+      .eq("wallet_address", order.wallet_address)
+      .maybeSingle();
+    const totalSpent = (prof?.total_spent_idr ?? 0) + order.total_idr;
+    const totalPoints = (prof?.total_points ?? 0) + points;
+    const totalOrders = (prof?.total_orders ?? 0) + 1;
+    let level: "bronze" | "silver" | "gold" | "platinum" = "bronze";
+    if (totalSpent >= 5_000_000) level = "platinum";
+    else if (totalSpent >= 1_500_000) level = "gold";
+    else if (totalSpent >= 500_000) level = "silver";
+    await supabaseAdmin.from("profiles").upsert(
+      {
+        wallet_address: order.wallet_address,
+        total_points: totalPoints,
+        total_orders: totalOrders,
+        total_spent_idr: totalSpent,
+        membership_level: level,
+      },
+      { onConflict: "wallet_address" },
+    );
+
+    await supabaseAdmin.from("notifications").insert({
+      wallet_address: order.wallet_address,
+      type: "payment_success",
+      title: "Pembayaran demo berhasil",
+      message: `Demo tx ${signature.slice(0, 12)}… tercatat sebagai pembayaran simulasi.`,
+    });
+
+    return { signature, explorerUrl };
+  });
+
+// ---------- Admin: list all orders ----------
+export const listAllOrders = createServerFn({ method: "GET" }).handler(async () => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("orders")
+    .select("*, transactions(*), order_items(*)")
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error) throw new Error(error.message);
+  return data ?? [];
+});
+
+// ---------- Admin: verify blockchain payment (mark transaction as verified) ----------
+const VerifyPaymentSchema = z.object({ orderId: z.string().uuid() });
+export const verifyPayment = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => VerifyPaymentSchema.parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("transactions")
+      .update({ status: "confirmed" })
+      .eq("order_id", data.orderId);
+    await supabaseAdmin
+      .from("orders")
+      .update({ status: "preparing" })
+      .eq("id", data.orderId);
+    const { data: ord } = await supabaseAdmin
+      .from("orders")
+      .select("wallet_address, order_number")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (ord) {
+      await supabaseAdmin.from("notifications").insert({
+        wallet_address: ord.wallet_address,
+        type: "payment_success",
+        title: "Pembayaran terverifikasi",
+        message: `Pesanan ${ord.order_number} telah diverifikasi admin & masuk antrian peracikan.`,
+      });
+    }
+    return { ok: true };
+  });
+
 export const listOrders = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => z.object({ walletAddress: z.string() }).parse(d))
   .handler(async ({ data }) => {

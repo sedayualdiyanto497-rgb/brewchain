@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
-import { Bell, Coffee, ShoppingBag, Sparkles, Trophy, Wallet } from "lucide-react";
+import { Bell, Coffee, Radio, ShoppingBag, Sparkles, Trophy, Wallet } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,8 @@ function DashboardPage() {
   const { session } = useWalletAuth();
   const { connection } = useConnection();
   const [solBalance, setSolBalance] = useState<number | null>(null);
+  const qc = useQueryClient();
+  const [liveBeat, setLiveBeat] = useState(0);
 
   useEffect(() => {
     if (!session) return;
@@ -55,6 +58,25 @@ function DashboardPage() {
   });
   const products = useQuery({ queryKey: ["products"], queryFn: () => listProducts() });
 
+  // Realtime: refresh orders & notifications when this wallet's rows change
+  useEffect(() => {
+    if (!session) return;
+    const wallet = session.walletAddress;
+    const channel = supabase
+      .channel(`user-${wallet}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `wallet_address=eq.${wallet}` }, () => {
+        qc.invalidateQueries({ queryKey: ["orders", wallet] });
+        qc.invalidateQueries({ queryKey: ["profile", wallet] });
+        setLiveBeat((n) => n + 1);
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `wallet_address=eq.${wallet}` }, () => {
+        qc.invalidateQueries({ queryKey: ["notifs", wallet] });
+        setLiveBeat((n) => n + 1);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [session, qc]);
+
   if (!session) return <RequireWallet />;
   const p = profile.data;
   const ord = orders.data ?? [];
@@ -68,7 +90,12 @@ function DashboardPage() {
           <p className="text-sm text-muted-foreground">Selamat datang kembali</p>
           <h1 className="font-display text-4xl font-bold">Halo, {p?.nickname ?? shortAddr(session.walletAddress)} ☕</h1>
         </div>
-        <Badge className="rounded-full gradient-coffee text-cream"><Trophy className="size-3" /> {p?.membership_level ?? "bronze"}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="rounded-full gap-1">
+            <Radio className={`size-3 ${liveBeat ? "text-emerald-500 animate-pulse" : "text-muted-foreground"}`} /> Live
+          </Badge>
+          <Badge className="rounded-full gradient-coffee text-cream"><Trophy className="size-3" /> {p?.membership_level ?? "bronze"}</Badge>
+        </div>
       </div>
 
       <div className="mt-8 grid gap-4 md:grid-cols-4">
