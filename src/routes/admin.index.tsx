@@ -1,19 +1,45 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { Activity, Coffee, ShoppingBag, Users, Wallet } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { Activity, Coffee, Radio, ShoppingBag, Users, Wallet } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ClientOnly } from "@/components/brewchain/ClientOnly";
 import { adminStats } from "@/lib/brewchain/orders.functions";
 import { formatIDR } from "@/lib/brewchain/format";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/")({
   component: () => <ClientOnly><AdminOverview /></ClientOnly>,
 });
 
 function AdminOverview() {
+  const qc = useQueryClient();
+  const [pulse, setPulse] = useState(0);
   const { data } = useQuery({ queryKey: ["admin-stats"], queryFn: () => adminStats() });
+
+  useEffect(() => {
+    const ch = supabase
+      .channel("admin-overview-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        qc.invalidateQueries({ queryKey: ["admin-stats"] });
+        setPulse((p) => p + 1);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, () => {
+        qc.invalidateQueries({ queryKey: ["admin-stats"] });
+        setPulse((p) => p + 1);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [qc]);
+
   return (
     <div>
+      <div className="mb-3 flex justify-end">
+        <Badge variant="outline" className="rounded-full gap-1">
+          <Radio className={`size-3 ${pulse ? "animate-pulse text-emerald-500" : "text-muted-foreground"}`} /> Realtime
+        </Badge>
+      </div>
       <div className="grid gap-4 md:grid-cols-5">
         <Kpi icon={Wallet} label="Revenue" value={formatIDR(data?.revenue ?? 0)} accent />
         <Kpi icon={Users} label="Customer" value={String(data?.totalCustomers ?? 0)} />

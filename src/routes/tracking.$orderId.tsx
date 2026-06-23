@@ -1,6 +1,8 @@
 import { createFileRoute, useParams } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, Circle, Clock, Coffee } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { CheckCircle2, Circle, Clock, Coffee, Radio } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { getOrder } from "@/lib/brewchain/orders.functions";
@@ -21,18 +23,33 @@ const STEPS = [
 
 function TrackingPage() {
   const { orderId } = useParams({ from: "/tracking/$orderId" });
+  const qc = useQueryClient();
   const { data: order } = useQuery({
     queryKey: ["order", orderId],
     queryFn: () => getOrder({ data: { orderId } }),
     refetchInterval: 5000,
   });
+  useEffect(() => {
+    const ch = supabase
+      .channel(`order-${orderId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `id=eq.${orderId}` }, () => {
+        qc.invalidateQueries({ queryKey: ["order", orderId] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [orderId, qc]);
   if (!order) return <AppShell><div className="container mx-auto px-4 py-20">Memuat…</div></AppShell>;
   const currentIdx = STEPS.findIndex((s) => s.key === order.status);
 
   return (
     <AppShell>
       <div className="container mx-auto max-w-3xl px-4 py-12">
-        <h1 className="font-display text-3xl font-bold">Lacak Pesanan</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="font-display text-3xl font-bold">Lacak Pesanan</h1>
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs text-emerald-600">
+            <Radio className="size-3 animate-pulse" /> Realtime
+          </span>
+        </div>
         <p className="mt-1 font-mono text-sm text-muted-foreground">{order.order_number}</p>
 
         <Card className="mt-8 rounded-3xl shadow-soft">

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
-import { Shield, BarChart3, Coffee, Users, Tag, Activity } from "lucide-react";
+import { Shield, BarChart3, Coffee, Users, Tag, Activity, ShoppingBag } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Badge } from "@/components/ui/badge";
 
@@ -23,6 +23,7 @@ function AdminLayout() {
 
         <nav className="mt-6 flex flex-wrap gap-2 rounded-2xl bg-secondary/40 p-1.5">
           <AdminTab to="/admin" icon={Activity}>Overview</AdminTab>
+          <AdminTab to="/admin/orders" icon={ShoppingBag}>Orders</AdminTab>
           <AdminTab to="/admin/analytics" icon={BarChart3}>Analytics</AdminTab>
           <AdminTab to="/admin/products" icon={Coffee}>Produk</AdminTab>
           <AdminTab to="/admin/customers" icon={Users}>Customer</AdminTab>
