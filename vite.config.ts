@@ -10,7 +10,6 @@ import { dirname, resolve } from "node:path";
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 const rpcWsBrowser = resolve(rootDir, "node_modules/rpc-websockets/dist/index.browser.mjs");
-const rpcWsNode = resolve(rootDir, "node_modules/rpc-websockets/dist/index.mjs");
 
 export default defineConfig({
   tanstackStart: {
@@ -21,7 +20,7 @@ export default defineConfig({
       alias: [
         {
           find: /^rpc-websockets$/,
-          replacement: typeof globalThis.window === "undefined" ? rpcWsNode : rpcWsBrowser,
+          replacement: rpcWsBrowser,
         },
       ],
     },
