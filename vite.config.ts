@@ -8,8 +8,15 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
     server: { entry: "server" },
+  },
+  vite: {
+    resolve: {
+      alias: [
+        // rpc-websockets only declares "browser" and "node" export conditions; workerd build can't resolve it.
+        { find: /^rpc-websockets$/, replacement: "rpc-websockets/dist/index.mjs" },
+        { find: /^rpc-websockets\/dist\/(.*)$/, replacement: "rpc-websockets/dist/$1" },
+      ],
+    },
   },
 });
