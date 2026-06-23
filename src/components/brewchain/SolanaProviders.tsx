@@ -1,10 +1,16 @@
 import { useMemo, type ReactNode } from "react";
+import { Buffer } from "buffer";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 import { BackpackWalletAdapter } from "@solana/wallet-adapter-backpack";
 import { SOLANA_ENDPOINT, SOLANA_CLUSTER } from "@/lib/solana/config";
 import { WalletAuthProvider } from "@/contexts/WalletAuthProvider";
+
+// Solana SDK expects a global Buffer in the browser.
+if (typeof window !== "undefined" && !(window as unknown as { Buffer?: unknown }).Buffer) {
+  (window as unknown as { Buffer: typeof Buffer }).Buffer = Buffer;
+}
 
 export function SolanaProviders({ children }: { children: ReactNode }) {
   const wallets = useMemo(
