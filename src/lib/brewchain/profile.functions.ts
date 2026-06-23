@@ -16,12 +16,12 @@ export const verifyWalletSignIn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const nacl = (await import("tweetnacl")).default;
     const bs58 = (await import("bs58")).default;
-    const { PublicKey } = await import("@solana/web3.js");
 
-    const pubkey = new PublicKey(data.walletAddress);
+    const pubkeyBytes = bs58.decode(data.walletAddress);
+    if (pubkeyBytes.length !== 32) throw new Error("Wallet address tidak valid");
     const messageBytes = new TextEncoder().encode(data.message);
     const signatureBytes = bs58.decode(data.signatureB58);
-    const ok = nacl.sign.detached.verify(messageBytes, signatureBytes, pubkey.toBytes());
+    const ok = nacl.sign.detached.verify(messageBytes, signatureBytes, pubkeyBytes);
     if (!ok) throw new Error("Tanda tangan tidak valid");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
