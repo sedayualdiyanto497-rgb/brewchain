@@ -2,8 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL, SystemProgram, Transaction, PublicKey } from "@solana/web3.js";
-import { motion } from "framer-motion";
-import { Loader2, Wallet, QrCode, Building2, ShieldCheck } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, Wallet, QrCode, Building2, ShieldCheck, CheckCircle2, Circle, ExternalLink } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,6 +23,16 @@ export const Route = createFileRoute("/checkout")({
 
 type Method = "solana" | "qris" | "bank_transfer";
 
+type PayStage = "creating" | "signing" | "broadcasting" | "confirming" | "recording" | "done" | "error";
+
+const STAGES: Array<{ key: PayStage; label: string; desc: string }> = [
+  { key: "creating",     label: "Membuat pesanan",        desc: "Mengunci harga & stok di server" },
+  { key: "signing",      label: "Tanda tangan wallet",    desc: "Setujui transaksi di wallet kamu" },
+  { key: "broadcasting", label: "Mengirim ke Devnet",     desc: "Broadcast transaksi ke validator Solana" },
+  { key: "confirming",   label: "Menunggu konfirmasi",    desc: "Menunggu finalisasi on-chain" },
+  { key: "recording",    label: "Mencatat ke database",   desc: "Menyimpan signature & memperbarui pesanan" },
+];
+
 function CheckoutPage() {
   const items = useCart();
   const { voucher } = Route.useSearch();
@@ -32,6 +42,9 @@ function CheckoutPage() {
   const navigate = useNavigate();
   const [method, setMethod] = useState<Method>("solana");
   const [paying, setPaying] = useState(false);
+  const [stage, setStage] = useState<PayStage | null>(null);
+  const [stageError, setStageError] = useState<string | null>(null);
+  const [liveSig, setLiveSig] = useState<string | null>(null);
 
   const subtotal = items.reduce((s, i) => s + i.priceIdr * i.quantity, 0);
   const totalSol = items.reduce((s, i) => s + i.priceSol * i.quantity, 0);
@@ -47,7 +60,10 @@ function CheckoutPage() {
     if (!isAuthenticated || !session) return toast.error("Login wallet terlebih dahulu");
     if (items.length === 0) return toast.error("Cart kosong");
     setPaying(true);
+    setStageError(null);
+    setLiveSig(null);
     try {
+      setStage("creating");
       // 1) create order on server (computes prices server-side, locks voucher)
       const order = await createOrder({
         data: {
@@ -73,10 +89,16 @@ function CheckoutPage() {
         tx.recentBlockhash = blockhash;
         tx.feePayer = publicKey;
 
+        setStage("signing");
         const signature = await sendTransaction(tx, connection);
-        toast("Menunggu konfirmasi blockchain…");
+        setLiveSig(signature);
+        setStage("broadcasting");
+        // small UX beat so user sees the broadcast stage
+        await new Promise((r) => setTimeout(r, 300));
+        setStage("confirming");
         await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
 
+        setStage("recording");
         await recordBlockchainTransaction({
           data: {
             orderId: order.id,
@@ -88,16 +110,21 @@ function CheckoutPage() {
           },
         });
 
+        setStage("done");
         cart.clear();
+        await new Promise((r) => setTimeout(r, 600));
         navigate({ to: "/success", search: { orderId: order.id, sig: signature } as never });
         return;
       }
 
       // QRIS / bank — verifikasi manual oleh kasir
+      setStage("done");
       cart.clear();
       navigate({ to: "/tracking/$orderId", params: { orderId: order.id } });
     } catch (e) {
       console.error(e);
+      setStage("error");
+      setStageError((e as Error)?.message ?? "Pembayaran gagal");
       toast.error("Pembayaran gagal", { description: (e as Error)?.message });
     } finally {
       setPaying(false);
@@ -109,6 +136,7 @@ function CheckoutPage() {
   }
 
   return (
+    <>
     <div className="container mx-auto grid gap-8 px-4 py-12 md:grid-cols-[1fr_400px]">
       <div className="space-y-6">
         <h1 className="font-display text-3xl font-bold">Checkout</h1>
@@ -187,6 +215,124 @@ function CheckoutPage() {
         </CardContent>
       </Card>
     </div>
+
+    <PaymentProgressOverlay
+      open={stage !== null && stage !== "done"}
+      stage={stage}
+      error={stageError}
+      signature={liveSig}
+      onClose={() => {
+        if (stage === "error") {
+          setStage(null);
+          setStageError(null);
+        }
+      }}
+    />
+    </>
+  );
+}
+
+function PaymentProgressOverlay({
+  open,
+  stage,
+  error,
+  signature,
+  onClose,
+}: {
+  open: boolean;
+  stage: PayStage | null;
+  error: string | null;
+  signature: string | null;
+  onClose: () => void;
+}) {
+  const currentIdx = stage ? STAGES.findIndex((s) => s.key === stage) : -1;
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 grid place-items-center bg-coffee-950/60 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ y: 16, opacity: 0, scale: 0.98 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 16, opacity: 0, scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 220, damping: 22 }}
+            className="w-[min(92vw,460px)] rounded-3xl bg-card p-6 shadow-2xl"
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-full gradient-solana text-white shadow-glow-sol">
+                <Wallet className="size-5" />
+              </div>
+              <div>
+                <div className="font-display text-lg font-bold">Memproses Pembayaran</div>
+                <div className="text-xs text-muted-foreground">Solana · Devnet</div>
+              </div>
+            </div>
+
+            <ol className="space-y-3">
+              {STAGES.map((s, i) => {
+                const done = currentIdx > i || (stage === "done" && i < STAGES.length);
+                const active = currentIdx === i && stage !== "error";
+                const isErrorHere = stage === "error" && currentIdx === i;
+                return (
+                  <li key={s.key} className="flex items-start gap-3">
+                    <div
+                      className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-full transition ${
+                        done
+                          ? "bg-emerald-500 text-white"
+                          : active
+                            ? "gradient-solana text-white shadow-glow-sol"
+                            : isErrorHere
+                              ? "bg-destructive text-destructive-foreground"
+                              : "bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      {done ? (
+                        <CheckCircle2 className="size-4" />
+                      ) : active ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Circle className="size-3.5" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className={`text-sm font-semibold ${active ? "text-foreground" : done ? "text-foreground" : "text-muted-foreground"}`}>
+                        {s.label}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{s.desc}</div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+
+            {signature && (
+              <a
+                href={`https://explorer.solana.com/tx/${signature}?cluster=devnet`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-5 flex items-center justify-between rounded-xl bg-secondary/50 p-3 text-xs font-mono hover:bg-secondary"
+              >
+                <span className="truncate">{signature.slice(0, 14)}…{signature.slice(-10)}</span>
+                <ExternalLink className="size-3.5 opacity-70" />
+              </a>
+            )}
+
+            {error && (
+              <div className="mt-5 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+                {error}
+                <Button onClick={onClose} variant="outline" size="sm" className="mt-3 w-full">
+                  Tutup & Coba Lagi
+                </Button>
+              </div>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
