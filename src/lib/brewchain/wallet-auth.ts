@@ -49,7 +49,7 @@ export const requireAdminWallet = createMiddleware({ type: "function" })
       .from("app_roles")
       .select("role")
       .eq("wallet_address", context.walletAddress)
-      .in("role", ["admin", "staff"]);
+      .in("role", ["admin", "cashier"]);
     if (!data || data.length === 0) {
       throw new Response("Forbidden: admin role required", { status: 403 });
     }
