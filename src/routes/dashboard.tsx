@@ -43,17 +43,17 @@ function DashboardPage() {
 
   const profile = useQuery({
     queryKey: ["profile", session?.walletAddress],
-    queryFn: () => getProfile({ data: { walletAddress: session!.walletAddress } }),
+    queryFn: () => getProfile(),
     enabled: !!session,
   });
   const orders = useQuery({
     queryKey: ["orders", session?.walletAddress],
-    queryFn: () => listOrders({ data: { walletAddress: session!.walletAddress } }),
+    queryFn: () => listOrders(),
     enabled: !!session,
   });
   const notifs = useQuery({
     queryKey: ["notifs", session?.walletAddress],
-    queryFn: () => getNotifications({ data: { walletAddress: session!.walletAddress } }),
+    queryFn: () => getNotifications(),
     enabled: !!session,
   });
   const products = useQuery({ queryKey: ["products"], queryFn: () => listProducts() });

@@ -30,7 +30,7 @@ function MenuPage() {
   const { session } = useWalletAuth();
   const toggleFav = useMutation({
     mutationFn: (productId: string) =>
-      toggleWishlist({ data: { walletAddress: session!.walletAddress, productId } }),
+      toggleWishlist({ data: { productId } }),
     onSuccess: (r) => toast.success(r.added ? "Ditambahkan ke wishlist" : "Dihapus dari wishlist"),
   });
 

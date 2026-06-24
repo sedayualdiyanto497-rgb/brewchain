@@ -19,7 +19,7 @@ function HistoryPage() {
   const { session } = useWalletAuth();
   const { data, isLoading } = useQuery({
     queryKey: ["orders", session?.walletAddress],
-    queryFn: () => listOrders({ data: { walletAddress: session!.walletAddress } }),
+    queryFn: () => listOrders(),
     enabled: !!session,
   });
 

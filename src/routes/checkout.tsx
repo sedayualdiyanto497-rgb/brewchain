@@ -59,7 +59,6 @@ function CheckoutPage() {
       setStage("creating");
       const order = await createOrder({
         data: {
-          walletAddress: session.walletAddress,
           items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
           voucherCode: voucher ?? null,
           paymentMethod: "solana",
@@ -73,7 +72,7 @@ function CheckoutPage() {
       await new Promise((r) => setTimeout(r, 500));
       setStage("confirming");
       const res = await payOrderDemo({
-        data: { orderId: order.id, walletAddress: session.walletAddress },
+        data: { orderId: order.id },
       });
       setLiveSig(res.signature);
       setStage("recording");

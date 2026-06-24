@@ -24,18 +24,18 @@ function ProfilePage() {
   const { session } = useWalletAuth();
   const profile = useQuery({
     queryKey: ["profile", session?.walletAddress],
-    queryFn: () => getProfile({ data: { walletAddress: session!.walletAddress } }),
+    queryFn: () => getProfile(),
     enabled: !!session,
   });
   const wishlist = useQuery({
     queryKey: ["wishlist", session?.walletAddress],
-    queryFn: () => getWishlist({ data: { walletAddress: session!.walletAddress } }),
+    queryFn: () => getWishlist(),
     enabled: !!session,
   });
   const memberships = useQuery({ queryKey: ["memberships"], queryFn: () => listMemberships() });
   const [nickname, setNickname] = useState("");
   const update = useMutation({
-    mutationFn: () => updateNickname({ data: { walletAddress: session!.walletAddress, nickname } }),
+    mutationFn: () => updateNickname({ data: { nickname } }),
     onSuccess: () => { toast.success("Nickname diperbarui"); profile.refetch(); },
   });
 

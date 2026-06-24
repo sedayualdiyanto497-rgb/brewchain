@@ -4,6 +4,7 @@ import bs58 from "bs58";
 import { toast } from "sonner";
 import { SIGN_IN_MESSAGE } from "@/lib/solana/config";
 import { verifyWalletSignIn } from "@/lib/brewchain/profile.functions";
+import { WALLET_TOKEN_STORAGE } from "@/lib/brewchain/wallet-auth";
 
 type Session = {
   walletAddress: string;
@@ -43,7 +44,10 @@ export function WalletAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!connected && session) {
       setSession(null);
-      if (typeof window !== "undefined") window.localStorage.removeItem(STORAGE_KEY);
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(STORAGE_KEY);
+        window.localStorage.removeItem(WALLET_TOKEN_STORAGE);
+      }
     }
   }, [connected, session]);
 
@@ -51,7 +55,10 @@ export function WalletAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (publicKey && session && publicKey.toBase58() !== session.walletAddress) {
       setSession(null);
-      if (typeof window !== "undefined") window.localStorage.removeItem(STORAGE_KEY);
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(STORAGE_KEY);
+        window.localStorage.removeItem(WALLET_TOKEN_STORAGE);
+      }
     }
   }, [publicKey, session]);
 
@@ -68,13 +75,16 @@ export function WalletAuthProvider({ children }: { children: ReactNode }) {
       const signature = await signMessage(encoded);
       const signatureB58 = bs58.encode(signature);
 
-      await verifyWalletSignIn({
+      const res = await verifyWalletSignIn({
         data: {
           walletAddress: publicKey.toBase58(),
           message,
           signatureB58,
         },
       });
+      if (typeof window !== "undefined" && res?.token) {
+        window.localStorage.setItem(WALLET_TOKEN_STORAGE, res.token);
+      }
 
       const next: Session = { walletAddress: publicKey.toBase58(), signedAt: Date.now() };
       setSession(next);
@@ -90,7 +100,10 @@ export function WalletAuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(() => {
     setSession(null);
-    if (typeof window !== "undefined") window.localStorage.removeItem(STORAGE_KEY);
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(WALLET_TOKEN_STORAGE);
+    }
     void disconnect();
     toast("Berhasil logout");
   }, [disconnect]);
