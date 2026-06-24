@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ClientOnly } from "@/components/brewchain/ClientOnly";
+import { RequireAdminGate } from "@/components/brewchain/RequireAdminGate";
 import { updateOrderStatus } from "@/lib/brewchain/orders.functions";
 import { formatIDR, shortAddr } from "@/lib/brewchain/format";
 import { toast } from "sonner";

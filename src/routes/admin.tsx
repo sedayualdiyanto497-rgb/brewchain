@@ -2,6 +2,8 @@ import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { Shield, BarChart3, Coffee, Users, Tag, Activity, ShoppingBag } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Badge } from "@/components/ui/badge";
+import { ClientOnly } from "@/components/brewchain/ClientOnly";
+import { RequireAdminGate } from "@/components/brewchain/RequireAdminGate";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin — BrewChain" }] }),
@@ -11,6 +13,8 @@ export const Route = createFileRoute("/admin")({
 function AdminLayout() {
   return (
     <AppShell>
+      <ClientOnly>
+        <RequireAdminGate>
       <div className="container mx-auto px-4 py-10">
         <div className="flex items-center gap-3">
           <div className="grid size-10 place-items-center rounded-xl gradient-coffee text-cream"><Shield className="size-5" /></div>
@@ -32,6 +36,8 @@ function AdminLayout() {
 
         <div className="mt-6"><Outlet /></div>
       </div>
+        </RequireAdminGate>
+      </ClientOnly>
     </AppShell>
   );
 }
