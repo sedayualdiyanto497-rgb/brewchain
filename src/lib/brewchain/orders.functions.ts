@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireWalletAuth, requireAdminWallet } from "./wallet-auth";
 
 const CartItemSchema = z.object({
   productId: z.string().uuid(),
@@ -7,7 +8,6 @@ const CartItemSchema = z.object({
 });
 
 const CreateOrderSchema = z.object({
-  walletAddress: z.string(),
   items: z.array(CartItemSchema).min(1).max(20),
   voucherCode: z.string().trim().toUpperCase().optional().nullable(),
   paymentMethod: z.enum(["solana", "qris", "bank_transfer"]).default("solana"),
@@ -22,8 +22,10 @@ function generateOrderNumber() {
 }
 
 export const createOrder = createServerFn({ method: "POST" })
+  .middleware([requireWalletAuth])
   .inputValidator((d: unknown) => CreateOrderSchema.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const walletAddress = context.walletAddress;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // fetch products to compute server-side prices
@@ -90,7 +92,7 @@ export const createOrder = createServerFn({ method: "POST" })
       .from("orders")
       .insert({
         order_number: orderNumber,
-        wallet_address: data.walletAddress,
+        wallet_address: walletAddress,
         subtotal_idr: subtotalIdr,
         discount_idr: discountIdr,
         tax_idr: taxIdr,
@@ -138,7 +140,6 @@ export const createOrder = createServerFn({ method: "POST" })
 
 const RecordTxSchema = z.object({
   orderId: z.string().uuid(),
-  walletAddress: z.string(),
   recipientAddress: z.string(),
   txSignature: z.string().min(10).max(200),
   totalSol: z.number().positive(),
@@ -146,14 +147,25 @@ const RecordTxSchema = z.object({
 });
 
 export const recordBlockchainTransaction = createServerFn({ method: "POST" })
+  .middleware([requireWalletAuth])
   .inputValidator((d: unknown) => RecordTxSchema.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const walletAddress = context.walletAddress;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Verify caller owns this order
+    const { data: ownerCheck } = await supabaseAdmin
+      .from("orders")
+      .select("wallet_address")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (!ownerCheck || ownerCheck.wallet_address !== walletAddress) {
+      throw new Response("Forbidden: order does not belong to caller", { status: 403 });
+    }
     const explorerUrl = `https://explorer.solana.com/tx/${data.txSignature}?cluster=devnet`;
 
     const { error: txErr } = await supabaseAdmin.from("transactions").insert({
       order_id: data.orderId,
-      wallet_address: data.walletAddress,
+      wallet_address: walletAddress,
       recipient_address: data.recipientAddress,
       tx_signature: data.txSignature,
       block_time: data.blockTime ?? null,
@@ -208,7 +220,7 @@ export const recordBlockchainTransaction = createServerFn({ method: "POST" })
     }
 
     await supabaseAdmin.from("notifications").insert({
-      wallet_address: data.walletAddress,
+      wallet_address: walletAddress,
       type: "payment_success",
       title: "Pembayaran berhasil",
       message: `Transaksi ${data.txSignature.slice(0, 8)}… tercatat di Solana Devnet`,
@@ -230,12 +242,13 @@ function fakeSignature() {
 
 const DemoPaySchema = z.object({
   orderId: z.string().uuid(),
-  walletAddress: z.string(),
 });
 
 export const payOrderDemo = createServerFn({ method: "POST" })
+  .middleware([requireWalletAuth])
   .inputValidator((d: unknown) => DemoPaySchema.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const walletAddress = context.walletAddress;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: order } = await supabaseAdmin
       .from("orders")
@@ -243,6 +256,9 @@ export const payOrderDemo = createServerFn({ method: "POST" })
       .eq("id", data.orderId)
       .maybeSingle();
     if (!order) throw new Error("Order tidak ditemukan");
+    if (order.wallet_address !== walletAddress) {
+      throw new Response("Forbidden: order does not belong to caller", { status: 403 });
+    }
     if (order.status !== "pending") throw new Error("Order sudah diproses");
 
     const signature = `demo_${fakeSignature()}`;
@@ -250,7 +266,7 @@ export const payOrderDemo = createServerFn({ method: "POST" })
 
     const { error: txErr } = await supabaseAdmin.from("transactions").insert({
       order_id: data.orderId,
-      wallet_address: data.walletAddress,
+      wallet_address: walletAddress,
       recipient_address: "DEMO_MERCHANT_WALLET_SIMULATED",
       tx_signature: signature,
       block_time: Math.floor(Date.now() / 1000),
@@ -304,7 +320,9 @@ export const payOrderDemo = createServerFn({ method: "POST" })
   });
 
 // ---------- Admin: list all orders ----------
-export const listAllOrders = createServerFn({ method: "GET" }).handler(async () => {
+export const listAllOrders = createServerFn({ method: "GET" })
+  .middleware([requireAdminWallet])
+  .handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("orders")
@@ -318,6 +336,7 @@ export const listAllOrders = createServerFn({ method: "GET" }).handler(async () 
 // ---------- Admin: verify blockchain payment (mark transaction as verified) ----------
 const VerifyPaymentSchema = z.object({ orderId: z.string().uuid() });
 export const verifyPayment = createServerFn({ method: "POST" })
+  .middleware([requireAdminWallet])
   .inputValidator((d: unknown) => VerifyPaymentSchema.parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -346,27 +365,39 @@ export const verifyPayment = createServerFn({ method: "POST" })
   });
 
 export const listOrders = createServerFn({ method: "GET" })
-  .inputValidator((d: unknown) => z.object({ walletAddress: z.string() }).parse(d))
-  .handler(async ({ data }) => {
+  .middleware([requireWalletAuth])
+  .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows } = await supabaseAdmin
       .from("orders")
       .select("*, transactions(*), order_items(*)")
-      .eq("wallet_address", data.walletAddress)
+      .eq("wallet_address", context.walletAddress)
       .order("created_at", { ascending: false })
       .limit(50);
     return rows ?? [];
   });
 
 export const getOrder = createServerFn({ method: "GET" })
+  .middleware([requireWalletAuth])
   .inputValidator((d: unknown) => z.object({ orderId: z.string().uuid() }).parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Allow admins to view any order; otherwise restrict to owner.
+    const { data: rolesRows } = await supabaseAdmin
+      .from("app_roles")
+      .select("role")
+      .eq("wallet_address", context.walletAddress)
+      .in("role", ["admin", "cashier"]);
+    const isStaff = (rolesRows?.length ?? 0) > 0;
     const { data: order } = await supabaseAdmin
       .from("orders")
       .select("*, transactions(*), order_items(*)")
       .eq("id", data.orderId)
       .maybeSingle();
+    if (!order) return null;
+    if (!isStaff && order.wallet_address !== context.walletAddress) {
+      throw new Response("Forbidden", { status: 403 });
+    }
     return order;
   });
 
@@ -376,6 +407,7 @@ const UpdateStatusSchema = z.object({
 });
 
 export const updateOrderStatus = createServerFn({ method: "POST" })
+  .middleware([requireAdminWallet])
   .inputValidator((d: unknown) => UpdateStatusSchema.parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -404,7 +436,9 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const adminStats = createServerFn({ method: "GET" }).handler(async () => {
+export const adminStats = createServerFn({ method: "GET" })
+  .middleware([requireAdminWallet])
+  .handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const [{ count: totalOrders }, { count: totalCustomers }, { count: totalProducts }, { count: totalTx }, { data: orders }] = await Promise.all([
     supabaseAdmin.from("orders").select("*", { count: "exact", head: true }),

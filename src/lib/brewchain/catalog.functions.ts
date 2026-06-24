@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireWalletAuth } from "./wallet-auth";
 
 export const listCategories = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -64,18 +65,19 @@ export const listMemberships = createServerFn({ method: "GET" }).handler(async (
 });
 
 const WishlistToggleSchema = z.object({
-  walletAddress: z.string(),
   productId: z.string().uuid(),
 });
 
 export const toggleWishlist = createServerFn({ method: "POST" })
+  .middleware([requireWalletAuth])
   .inputValidator((d: unknown) => WishlistToggleSchema.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const walletAddress = context.walletAddress;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: existing } = await supabaseAdmin
       .from("wishlist")
       .select("id")
-      .eq("wallet_address", data.walletAddress)
+      .eq("wallet_address", walletAddress)
       .eq("product_id", data.productId)
       .maybeSingle();
     if (existing) {
@@ -83,25 +85,24 @@ export const toggleWishlist = createServerFn({ method: "POST" })
       return { added: false };
     }
     await supabaseAdmin.from("wishlist").insert({
-      wallet_address: data.walletAddress,
+      wallet_address: walletAddress,
       product_id: data.productId,
     });
     return { added: true };
   });
 
 export const getWishlist = createServerFn({ method: "GET" })
-  .inputValidator((d: unknown) => z.object({ walletAddress: z.string() }).parse(d))
-  .handler(async ({ data }) => {
+  .middleware([requireWalletAuth])
+  .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows } = await supabaseAdmin
       .from("wishlist")
       .select("product:products(id, name, slug, image_url, price_idr, rating_avg)")
-      .eq("wallet_address", data.walletAddress);
+      .eq("wallet_address", context.walletAddress);
     return (rows ?? []).map((r) => r.product).filter(Boolean);
   });
 
 const AddReviewSchema = z.object({
-  walletAddress: z.string(),
   productId: z.string().uuid(),
   orderId: z.string().uuid().optional(),
   rating: z.number().int().min(1).max(5),
@@ -109,12 +110,13 @@ const AddReviewSchema = z.object({
 });
 
 export const addReview = createServerFn({ method: "POST" })
+  .middleware([requireWalletAuth])
   .inputValidator((d: unknown) => AddReviewSchema.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("reviews").insert({
       product_id: data.productId,
-      wallet_address: data.walletAddress,
+      wallet_address: context.walletAddress,
       order_id: data.orderId ?? null,
       rating: data.rating,
       comment: data.comment ?? null,
