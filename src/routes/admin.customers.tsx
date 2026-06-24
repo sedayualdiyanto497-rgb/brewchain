@@ -1,12 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
+import { requireAdminWallet } from "@/lib/brewchain/wallet-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ClientOnly } from "@/components/brewchain/ClientOnly";
 import { formatIDR, shortAddr } from "@/lib/brewchain/format";
 
-const listCustomers = createServerFn({ method: "GET" }).handler(async () => {
+const listCustomers = createServerFn({ method: "GET" })
+  .middleware([requireAdminWallet])
+  .handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data } = await supabaseAdmin.from("profiles").select("*").order("total_spent_idr", { ascending: false }).limit(50);
   return data ?? [];

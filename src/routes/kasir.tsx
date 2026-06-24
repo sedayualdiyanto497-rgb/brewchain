@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
+import { requireAdminWallet } from "@/lib/brewchain/wallet-auth";
 import { CheckCircle2, Clock, Coffee } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,7 +12,9 @@ import { updateOrderStatus } from "@/lib/brewchain/orders.functions";
 import { formatIDR, shortAddr } from "@/lib/brewchain/format";
 import { toast } from "sonner";
 
-const listActiveOrders = createServerFn({ method: "GET" }).handler(async () => {
+const listActiveOrders = createServerFn({ method: "GET" })
+  .middleware([requireAdminWallet])
+  .handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data } = await supabaseAdmin
     .from("orders")
@@ -23,7 +26,7 @@ const listActiveOrders = createServerFn({ method: "GET" }).handler(async () => {
 
 export const Route = createFileRoute("/kasir")({
   head: () => ({ meta: [{ title: "Kasir — BrewChain" }] }),
-  component: () => <AppShell><ClientOnly><Kasir /></ClientOnly></AppShell>,
+  component: () => <AppShell><ClientOnly><RequireAdminGate><Kasir /></RequireAdminGate></ClientOnly></AppShell>,
 });
 
 const NEXT_STATUS: Record<string, "paid" | "preparing" | "ready" | "completed" | null> = {
@@ -32,6 +35,7 @@ const NEXT_STATUS: Record<string, "paid" | "preparing" | "ready" | "completed" |
 
 function Kasir() {
   const { data, refetch } = useQuery({ queryKey: ["kasir-orders"], queryFn: () => listActiveOrders(), refetchInterval: 5000 });
+  void refetch;
   const update = useMutation({
     mutationFn: (vars: { orderId: string; status: "paid" | "preparing" | "ready" | "completed" }) =>
       updateOrderStatus({ data: vars }),
