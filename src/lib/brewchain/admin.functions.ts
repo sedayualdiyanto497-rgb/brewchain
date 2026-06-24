@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireAdminWallet } from "./wallet-auth";
 
 // ---------------- Products CRUD ----------------
 const ProductInputSchema = z.object({
@@ -16,7 +17,9 @@ const ProductInputSchema = z.object({
   is_active: z.boolean().optional(),
 });
 
-export const adminListProducts = createServerFn({ method: "GET" }).handler(async () => {
+export const adminListProducts = createServerFn({ method: "GET" })
+  .middleware([requireAdminWallet])
+  .handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("products")
@@ -27,6 +30,7 @@ export const adminListProducts = createServerFn({ method: "GET" }).handler(async
 });
 
 export const createProduct = createServerFn({ method: "POST" })
+  .middleware([requireAdminWallet])
   .inputValidator((d: unknown) => ProductInputSchema.parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -36,6 +40,7 @@ export const createProduct = createServerFn({ method: "POST" })
   });
 
 export const updateProduct = createServerFn({ method: "POST" })
+  .middleware([requireAdminWallet])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).merge(ProductInputSchema.partial()).parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -46,6 +51,7 @@ export const updateProduct = createServerFn({ method: "POST" })
   });
 
 export const deleteProduct = createServerFn({ method: "POST" })
+  .middleware([requireAdminWallet])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -66,7 +72,9 @@ const VoucherInputSchema = z.object({
   is_active: z.boolean().optional(),
 });
 
-export const adminListVouchers = createServerFn({ method: "GET" }).handler(async () => {
+export const adminListVouchers = createServerFn({ method: "GET" })
+  .middleware([requireAdminWallet])
+  .handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("vouchers")
@@ -77,6 +85,7 @@ export const adminListVouchers = createServerFn({ method: "GET" }).handler(async
 });
 
 export const createVoucher = createServerFn({ method: "POST" })
+  .middleware([requireAdminWallet])
   .inputValidator((d: unknown) => VoucherInputSchema.parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -86,6 +95,7 @@ export const createVoucher = createServerFn({ method: "POST" })
   });
 
 export const updateVoucher = createServerFn({ method: "POST" })
+  .middleware([requireAdminWallet])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).merge(VoucherInputSchema.partial()).parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -96,6 +106,7 @@ export const updateVoucher = createServerFn({ method: "POST" })
   });
 
 export const deleteVoucher = createServerFn({ method: "POST" })
+  .middleware([requireAdminWallet])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -105,7 +116,9 @@ export const deleteVoucher = createServerFn({ method: "POST" })
   });
 
 // ---------------- Membership listing (read-only) ----------------
-export const adminListMemberships = createServerFn({ method: "GET" }).handler(async () => {
+export const adminListMemberships = createServerFn({ method: "GET" })
+  .middleware([requireAdminWallet])
+  .handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin.from("memberships").select("*").order("min_spend_idr");
   if (error) throw new Error(error.message);

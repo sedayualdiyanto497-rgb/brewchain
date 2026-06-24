@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireWalletAuth } from "./wallet-auth";
 
 const SignInSchema = z.object({
   walletAddress: z.string().min(32).max(64),
@@ -42,47 +43,68 @@ export const verifyWalletSignIn = createServerFn({ method: "POST" })
       message: "Selamat datang kembali di BrewChain ☕",
     });
 
-    return { ok: true, walletAddress: data.walletAddress };
+    // Mint a signed session token bound to the verified wallet.
+    const { mintWalletToken } = await import("./wallet-session.server");
+    const token = mintWalletToken(data.walletAddress);
+    return { ok: true, walletAddress: data.walletAddress, token };
   });
 
 export const getProfile = createServerFn({ method: "GET" })
-  .inputValidator((d: unknown) => z.object({ walletAddress: z.string() }).parse(d))
-  .handler(async ({ data }) => {
+  .middleware([requireWalletAuth])
+  .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("*")
-      .eq("wallet_address", data.walletAddress)
+      .eq("wallet_address", context.walletAddress)
       .maybeSingle();
     return profile;
   });
 
 const NicknameSchema = z.object({
-  walletAddress: z.string(),
   nickname: z.string().trim().min(2).max(40),
 });
 
 export const updateNickname = createServerFn({ method: "POST" })
+  .middleware([requireWalletAuth])
   .inputValidator((d: unknown) => NicknameSchema.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("profiles")
       .update({ nickname: data.nickname })
-      .eq("wallet_address", data.walletAddress);
+      .eq("wallet_address", context.walletAddress);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
 
 export const getNotifications = createServerFn({ method: "GET" })
-  .inputValidator((d: unknown) => z.object({ walletAddress: z.string() }).parse(d))
-  .handler(async ({ data }) => {
+  .middleware([requireWalletAuth])
+  .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows } = await supabaseAdmin
       .from("notifications")
       .select("*")
-      .eq("wallet_address", data.walletAddress)
+      .eq("wallet_address", context.walletAddress)
       .order("created_at", { ascending: false })
       .limit(30);
     return rows ?? [];
+  });
+
+/** Returns the caller's admin/cashier role, or null. */
+export const getMyRole = createServerFn({ method: "GET" })
+  .middleware([requireWalletAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("app_roles")
+      .select("role")
+      .eq("wallet_address", context.walletAddress);
+    const roles = (data ?? []).map((r) => r.role);
+    return {
+      walletAddress: context.walletAddress,
+      roles,
+      isAdmin: roles.includes("admin"),
+      isStaff: roles.includes("admin") || roles.includes("cashier"),
+    };
   });
