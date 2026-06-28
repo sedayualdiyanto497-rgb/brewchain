@@ -155,11 +155,12 @@ export const adminListAuditLog = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) throw new Error(error.message);
-    return (data ?? []) as Array<{
+    type Row = {
       id: string; actor_wallet: string; actor_role: string | null;
       action: string; target_type: string | null; target_id: string | null;
-      meta: Record<string, unknown>; created_at: string;
-    }>;
+      meta: unknown; created_at: string;
+    };
+    return (data ?? []) as Row[];
   });
 
 // ---------------- Membership listing (read-only) ----------------
