@@ -1,6 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireWalletAuth, requireAdminWallet } from "./wallet-auth";
+import { recordAuditEvent } from "./audit.server";
+
+const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]+$/;
+const WalletAddressSchema = z.string().trim().min(32).max(44).regex(BASE58_RE);
+const TxSignatureSchema = z
+  .string()
+  .trim()
+  .min(64)
+  .max(128)
+  .regex(/^(demo_)?[1-9A-HJ-NP-Za-km-z]+$/);
 
 const CartItemSchema = z.object({
   productId: z.string().uuid(),
@@ -140,10 +150,10 @@ export const createOrder = createServerFn({ method: "POST" })
 
 const RecordTxSchema = z.object({
   orderId: z.string().uuid(),
-  recipientAddress: z.string(),
-  txSignature: z.string().min(10).max(200),
-  totalSol: z.number().positive(),
-  blockTime: z.number().nullable().optional(),
+  recipientAddress: WalletAddressSchema,
+  txSignature: TxSignatureSchema,
+  totalSol: z.number().positive().max(1_000_000),
+  blockTime: z.number().int().nullable().optional(),
 });
 
 export const recordBlockchainTransaction = createServerFn({ method: "POST" })
@@ -338,7 +348,7 @@ const VerifyPaymentSchema = z.object({ orderId: z.string().uuid() });
 export const verifyPayment = createServerFn({ method: "POST" })
   .middleware([requireAdminWallet])
   .inputValidator((d: unknown) => VerifyPaymentSchema.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
       .from("transactions")
@@ -361,6 +371,14 @@ export const verifyPayment = createServerFn({ method: "POST" })
         message: `Pesanan ${ord.order_number} telah diverifikasi admin & masuk antrian peracikan.`,
       });
     }
+    await recordAuditEvent({
+      actorWallet: context.walletAddress,
+      actorRole: context.role,
+      action: "order.verify_payment",
+      targetType: "order",
+      targetId: data.orderId,
+      meta: { orderNumber: ord?.order_number ?? null },
+    });
     return { ok: true };
   });
 
@@ -409,11 +427,11 @@ const UpdateStatusSchema = z.object({
 export const updateOrderStatus = createServerFn({ method: "POST" })
   .middleware([requireAdminWallet])
   .inputValidator((d: unknown) => UpdateStatusSchema.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: ord } = await supabaseAdmin
       .from("orders")
-      .select("wallet_address")
+      .select("wallet_address, status, order_number")
       .eq("id", data.orderId)
       .maybeSingle();
     await supabaseAdmin.from("orders").update({ status: data.status }).eq("id", data.orderId);
@@ -433,6 +451,14 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
         message: `Status pesanan diperbarui menjadi ${data.status}.`,
       });
     }
+    await recordAuditEvent({
+      actorWallet: context.walletAddress,
+      actorRole: context.role,
+      action: "order.status_change",
+      targetType: "order",
+      targetId: data.orderId,
+      meta: { from: ord?.status ?? null, to: data.status, orderNumber: ord?.order_number ?? null },
+    });
     return { ok: true };
   });
 

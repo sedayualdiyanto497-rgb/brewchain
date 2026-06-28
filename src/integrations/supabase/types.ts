@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          actor_role: string | null
+          actor_wallet: string
+          created_at: string
+          id: string
+          meta: Json
+          target_id: string | null
+          target_type: string | null
+        }
+        Insert: {
+          action: string
+          actor_role?: string | null
+          actor_wallet: string
+          created_at?: string
+          id?: string
+          meta?: Json
+          target_id?: string | null
+          target_type?: string | null
+        }
+        Update: {
+          action?: string
+          actor_role?: string | null
+          actor_wallet?: string
+          created_at?: string
+          id?: string
+          meta?: Json
+          target_id?: string | null
+          target_type?: string | null
+        }
+        Relationships: []
+      }
       app_roles: {
         Row: {
           created_at: string
