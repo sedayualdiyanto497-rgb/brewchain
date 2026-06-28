@@ -1,7 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-// Lifetime: 7 days
-const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+// Lifetime: 7 days. Warning surfaced to UI when within 1 hour of expiry.
+export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+export const SESSION_WARN_WINDOW_MS = 60 * 60 * 1000;
 
 function getSecret(): string {
   const s = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
@@ -25,13 +26,22 @@ function sign(payload: string): string {
 
 /** Mint a signed wallet session token. */
 export function mintWalletToken(walletAddress: string): string {
-  const payload = b64url(JSON.stringify({ w: walletAddress, iat: Date.now() }));
+  const iat = Date.now();
+  const payload = b64url(JSON.stringify({ w: walletAddress, iat, exp: iat + SESSION_MAX_AGE_MS }));
   const sig = sign(payload);
   return `${payload}.${sig}`;
 }
 
+export type VerifiedSession = { wallet: string; issuedAt: number; expiresAt: number };
+
 /** Returns the verified wallet address or null. Constant-time signature check. */
 export function verifyWalletToken(token: string | null | undefined): string | null {
+  const s = verifyWalletSession(token);
+  return s?.wallet ?? null;
+}
+
+/** Returns full verified session (wallet + timestamps) or null. */
+export function verifyWalletSession(token: string | null | undefined): VerifiedSession | null {
   if (!token || typeof token !== "string") return null;
   const idx = token.indexOf(".");
   if (idx <= 0 || idx === token.length - 1) return null;
@@ -42,10 +52,11 @@ export function verifyWalletToken(token: string | null | undefined): string | nu
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   try {
-    const parsed = JSON.parse(b64urlDecode(payload).toString("utf8")) as { w?: string; iat?: number };
+    const parsed = JSON.parse(b64urlDecode(payload).toString("utf8")) as { w?: string; iat?: number; exp?: number };
     if (!parsed.w || typeof parsed.iat !== "number") return null;
-    if (Date.now() - parsed.iat > MAX_AGE_MS) return null;
-    return parsed.w;
+    const exp = typeof parsed.exp === "number" ? parsed.exp : parsed.iat + SESSION_MAX_AGE_MS;
+    if (Date.now() > exp) return null;
+    return { wallet: parsed.w, issuedAt: parsed.iat, expiresAt: exp };
   } catch {
     return null;
   }

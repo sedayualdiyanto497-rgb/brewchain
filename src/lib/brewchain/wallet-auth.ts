@@ -29,12 +29,15 @@ export const attachWalletToken = createMiddleware({ type: "function" }).client(a
 export const requireWalletAuth = createMiddleware({ type: "function" }).server(async ({ next }) => {
   const req = getRequest();
   const token = req?.headers?.get(HEADER) ?? null;
-  const { verifyWalletToken } = await import("./wallet-session.server");
-  const wallet = verifyWalletToken(token);
-  if (!wallet) {
-    throw new Response("Unauthorized: wallet session invalid", { status: 401 });
+  const { verifyWalletSession } = await import("./wallet-session.server");
+  const session = verifyWalletSession(token);
+  if (!session) {
+    throw new Response(
+      JSON.stringify({ code: "WALLET_SESSION_INVALID", message: "Wallet session expired or invalid. Please sign in again." }),
+      { status: 401, headers: { "content-type": "application/json" } },
+    );
   }
-  return next({ context: { walletAddress: wallet } });
+  return next({ context: { walletAddress: session.wallet, sessionExpiresAt: session.expiresAt } });
 });
 
 /**
