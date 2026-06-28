@@ -215,9 +215,13 @@ function fileFor(rel: string): string {
 /** Extract `export const <name>` blocks (until the next top-level `export const` or EOF). */
 function extractServerFnBlocks(src: string): Record<string, string> {
   const out: Record<string, string> = {};
-  const re = /^export const (\w+) = createServerFn\b[\s\S]*?(?=^export const |\Z)/gm;
+  // Append a sentinel so the regex can terminate the last block consistently.
+  const padded = src + "\nexport const __END_SENTINEL__ = createServerFn";
+  const re = /^export const (\w+) = createServerFn\b[\s\S]*?(?=^export const )/gm;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(src))) out[m[1]] = m[0];
+  while ((m = re.exec(padded))) {
+    if (m[1] !== "__END_SENTINEL__") out[m[1]] = m[0];
+  }
   return out;
 }
 
