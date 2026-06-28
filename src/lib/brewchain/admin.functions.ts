@@ -158,9 +158,11 @@ export const adminListAuditLog = createServerFn({ method: "GET" })
     type Row = {
       id: string; actor_wallet: string; actor_role: string | null;
       action: string; target_type: string | null; target_id: string | null;
-      meta: unknown; created_at: string;
+      meta: string; created_at: string;
     };
-    return (data ?? []) as Row[];
+    const rows = (data ?? []) as Array<Omit<Row, "meta"> & { meta: unknown }>;
+    // Serialize meta to JSON string so the server-fn response stays trivially serializable.
+    return rows.map((r) => ({ ...r, meta: JSON.stringify(r.meta ?? {}) })) as Row[];
   });
 
 // ---------------- Membership listing (read-only) ----------------
